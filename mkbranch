@@ -1,5 +1,7 @@
 #!/bin/sh
 # @author Nicolas Thouvenin 
+# @link http://blog.touv.fr/2010/03/numeroter-automatiquement-des-branches.html
+# @link http://github.com/touv/misc/blob/master/mkbranch
 SCRIPT_NAME=`basename $0`
 SCRIPT_PATH=`dirname $0`
 
