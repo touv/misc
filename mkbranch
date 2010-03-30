@@ -1,0 +1,133 @@
+#!/bin/sh
+# @author Nicolas Thouvenin 
+SCRIPT_NAME=`basename $0`
+SCRIPT_PATH=`dirname $0`
+
+usage() {
+cat <<EOF
+
+    SYNTAXE :
+        ${SCRIPT_NAME} [ [-n|--new] |
+                         [-u|--update] |
+                         [[-v|--version] VERSION ]
+                       ] REPERTOIRE
+
+    DETAILS :
+        Création d'une branche versionnée sur un répertoire sous le contrôle de svn
+
+        --new     : Bascule majeur, création d'un nouveau numéro de version
+        --update  : Bascule minueur, création d'une sous version
+        --version : Force le numéro de version (très utile en cas de problème)
+
+
+    EXEMPLES :
+        $SCRIPT_NAME .
+        $SCRIPT_NAME -n trunk
+        $SCRIPT_NAME -u trunk/module
+        $SCRIPT_NAME --update trunk/module 
+        $SCRIPT_NAME --version VERSION_4_2 module
+
+EOF
+    exit 0;
+}
+
+PREFIX="VERSION"          # Préfix du nom de chaque branche
+SEPARATOR="_"             # Séparateur entre le préfix et les numéros majeurs et mineurs
+
+
+VERSION=""
+ACTION=""
+MODULE=""
+NEXT=""
+for argument in $*
+do
+	if [ ! -z "${NEXT}" ]
+	then
+		CMD="if [ -z \"\${${NEXT}}\" ]; then export ${NEXT}=\"${argument}\"; else export ${NEXT}=\"\${${NEXT}} ${argument}\"; fi;"
+		eval ${CMD}
+		NEXT=""
+	else
+		case $argument in
+			-h | --help )
+			usage
+			;;
+			-n | --new )
+			ACTION="new"
+			;; 
+			-u | --update )
+			ACTION="upd"
+			;; 
+			-v | --version )
+			NEXT="VERSION"
+			;; 
+			* )
+			MODULE=$argument
+			;;
+		esac
+	fi
+done
+
+
+VERSION=${VERSION:=}
+ACTION=${ACTION:=upd}
+SKIPPING=${ACTION:=}
+
+if test ${#} -eq 0
+then
+	usage
+fi
+if test "x${MODULE}" = "x"
+then
+	usage
+fi
+TRUNK=`svn info --xml ${MODULE} | grep "<url>" | sed -e "s/<url>//" -e "s/<\/url>//"`/
+if test "x${TRUNK}" = "x/"
+then
+	usage
+fi
+BRANCHES=`echo ${TRUNK} | sed -e "s/\/trunk/\/branches/"`
+if test "${TRUNK}" = "${BRANCHES}"
+then
+	usage
+fi
+echo "Dépôt trouvé : ${TRUNK}"
+if test "x${VERSION}" = "x" 
+then
+	echo "Calcul du nouveau numéro de version ..."
+	AWK=`echo "awk '\$""0 !~ /${SEPARATOR}/ { print \$""0\"${SEPARATOR}0\"} $""0 ~/${SEPARATOR}/ { print $""0}'"`
+	MAJEUR=`svn list ${BRANCHES}/ | grep "${PREFIX}${SEPARATOR}"  | sed -e"s/\///" -e"s/${PREFIX}${SEPARATOR}//" | eval ${AWK} | sed -e"s/${SEPARATOR}/ /" | sort -n | cut -f 1 -d " " | tail -1`
+	MINEUR=`svn list ${BRANCHES}/ | grep "${PREFIX}${SEPARATOR}"  | sed -e"s/\///" -e"s/${PREFIX}${SEPARATOR}//" | eval ${AWK} | sed -e"s/${SEPARATOR}/ /" | sort -n | cut -f 2 -d " " | tail -1`
+	
+	if test "x${MAJEUR}" = "x"
+	then 
+		MAJEUR="0"
+	fi
+	if test "x${MINEUR}" = "x"
+	then
+		MINEUR="0"
+	fi
+
+	echo "Version trouvée : ${PREFIX}${SEPARATOR}${MAJEUR}${SEPARATOR}${MINEUR}"
+
+	if test "x${ACTION}" = "xupd" 
+	then
+		MINEUR=`expr $MINEUR + 1 2>/dev/null`
+		VERSION="${PREFIX}${SEPARATOR}${MAJEUR}${SEPARATOR}${MINEUR}"
+	elif test "x${ACTION}" = "xnew"
+	then
+		MAJEUR=`expr ${MAJEUR} + 1 2>/dev/null`
+		VERSION="${PREFIX}${SEPARATOR}${MAJEUR}"
+	fi
+fi
+
+echo "Nouveau numéro  : ${VERSION}"
+echo "Confirmer le branchage  (O/N)"
+read -r CONFIRM
+if test "x${CONFIRM}" != "xO" 
+then
+	echo "Branchage abandonné !"
+	exit 1
+fi
+echo "Branchage de ${MODULE} en ${VERSION} ..."
+svn cp ${TRUNK} ${BRANCHES}${VERSION} -m "$0 ${VERSION}"
+exit $?
