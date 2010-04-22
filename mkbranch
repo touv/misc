@@ -7,6 +7,10 @@
 # For the full copyright and license information, please view the LICENSE
 # file that was distributed with this source code.
 #
+# More informations :
+#  http://blog.touv.fr/2010/03/numeroter-automatiquement-des-branches.html
+#  http://github.com/touv/misc/blob/master/mkbranch
+
 SCRIPT_NAME=`basename $0`
 SCRIPT_PATH=`dirname $0`
 
@@ -136,5 +140,5 @@ then
 	exit 1
 fi
 echo "Branchage de ${MODULE} en ${VERSION} ..."
-svn cp ${TRUNK} ${BRANCHES}${VERSION} -m "$0 ${VERSION}"
+svn cp ${TRUNK} ${BRANCHES}${VERSION}/ -m "$0 ${VERSION}"
 exit $?
